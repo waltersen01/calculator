@@ -1,0 +1,12 @@
+{
+  "name": "finanzkompass-proxy",
+  "private": true,
+  "type": "module",
+  "description": "Proxy für die Enable Banking API (Cloudflare Worker oder Docker)",
+  "scripts": {
+    "start": "node node-server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

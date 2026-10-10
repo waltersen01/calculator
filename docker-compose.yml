@@ -1,0 +1,38 @@
+# Finanzkompass als Docker-Container
+#   Starten:            docker compose up -d --build        → http://localhost:8080
+#   Mit Live-Verbindung: docker compose --profile live up -d --build   (vorher .env und secrets/ einrichten, siehe README)
+name: finanzkompass
+
+services:
+  app:
+    build: .
+    image: finanzkompass-app:latest
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # Optional: Proxy für die Live-Verbindung über Enable Banking (PSD2)
+  proxy:
+    profiles: ["live"]
+    build: ./server
+    image: finanzkompass-proxy:latest
+    environment:
+      EB_APP_ID: ${EB_APP_ID:-}
+      EB_PRIVATE_KEY_FILE: /run/secrets/enablebanking_key
+      ACCESS_TOKEN: ${ACCESS_TOKEN:-}
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-http://localhost:8080}
+    secrets:
+      - enablebanking_key
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+
+secrets:
+  enablebanking_key:
+    file: ./secrets/enablebanking.pem
