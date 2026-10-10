@@ -16,13 +16,25 @@
       FK.toast('Hinweis ausgeblendet', { icon: 'eye-off', tone: 'info' });
     },
     theme: (el) => S.act.setSetting('theme', el.dataset.value),
-    sync: (el, ev, done) => {
-      if (el) el.disabled = true;
-      setTimeout(() => {
-        S.sync();
-        FK.toast('Alle Konten sind aktuell');
+    /** Aktualisieren: Live-Konten abrufen, sonst neuen CSV-Import anbieten */
+    sync: async (el, ev, done) => {
+      const liveAccounts = S.accounts().filter((a) => a.source === 'live');
+      if (!S.hasData()) { if (done) done(); FK.connect(); return; }
+      if (!liveAccounts.length) {
         if (done) done();
-      }, 1100);
+        const csv = S.accounts().filter((a) => a.source !== 'live' && a.type !== 'depot').sort((a, b) => (a.updatedAt || '') < (b.updatedAt || '') ? -1 : 1)[0];
+        FK.connect(csv ? { accountId: csv.id, method: 'csv' } : {});
+        return;
+      }
+      if (el) el.disabled = true;
+      try {
+        const r = await FK.live.syncAll();
+        if (r.failed.length) FK.toast(`${r.failed[0].account.name}: ${r.failed[0].error}`, { icon: 'alert', tone: 'info', duration: 5000 });
+        else FK.toast('Alle Live-Konten sind aktuell');
+      } finally {
+        if (el) el.disabled = false;
+        if (done) done();
+      }
     },
   });
 
@@ -80,7 +92,7 @@
           <button type="button" data-action="theme" data-value="light">Hell</button>
           <button type="button" data-action="theme" data-value="dark">Dunkel</button>
         </div>
-        <p class="note">Alle Daten sind Beispieldaten. Es werden keine Bankzugangsdaten abgefragt oder übertragen. Kein offizielles Produkt von Finanzguru.</p>
+        <p class="note">Deine Daten bleiben auf deinem Gerät: CSV-Import für Sparkasse und Trade Republic, Live-Verbindung über PSD2 optional. Kein offizielles Produkt von Finanzguru.</p>
       </aside>
       <div class="device-slot">
         <div class="device">
@@ -100,7 +112,7 @@
     return stage;
   }
 
-  /* ---------- Sperrbildschirm (Face ID wird simuliert) ---------- */
+  /* ---------- Sperrbildschirm (Sichtschutz, keine Verschlüsselung) ---------- */
   function showLock() {
     const app = document.getElementById('app');
     const lock = document.createElement('div');
@@ -108,8 +120,8 @@
     lock.setAttribute('role', 'dialog');
     lock.setAttribute('aria-label', 'App gesperrt');
     lock.innerHTML = String(html`<div class="logo">${FK.ui.logo(84)}</div>
-      <h2>${FK.config.appName}</h2><p>Mit Face ID entsperren</p>
-      <div class="faceid" aria-hidden="true">${icon('face-id', 40)}</div>
+      <h2>${FK.config.appName}</h2><p>Gesperrt</p>
+      <div class="faceid" aria-hidden="true">${icon('lock', 36)}</div>
       <button type="button" class="btn">Entsperren</button>`);
     app.appendChild(lock);
     document.querySelector('.statusbar').style.color = '#fff';
@@ -169,10 +181,12 @@
 
     // Neuer Tag seit dem letzten Öffnen? Dann Daten neu erzeugen.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && FK.date.ymd(new Date()) !== FK.date.ymd(S.today())) S.sync();
+      if (document.visibilityState === 'visible' && FK.date.ymd(new Date()) !== FK.date.ymd(S.today())) { S.rebuild(); FK.nav.refresh(); }
     });
 
     if (S.setting('appLock')) showLock();
+    // Rückkehr von der Bank nach einer Live-Freigabe
+    FK.finishLiveConnection();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

@@ -46,6 +46,9 @@
   /* ---------- Analyse ---------- */
   FK.screens.analysis = {
     render() {
+      if (!S.hasData()) {
+        return { title: 'Analyse', body: html`${ui.empty('analysis', 'Noch nichts auszuwerten', 'Sobald du Umsätze importierst, siehst du hier Einnahmen, Ausgaben und Kategorien pro Monat.')}<button type="button" class="btn" data-action="connect">${icon('plus', 20)}Konto verbinden</button>` };
+      }
       const ym = S.ui.analysisMonth || S.curYM();
       const mode = S.ui.analysisMode;
       const m = S.month(ym);
@@ -97,6 +100,7 @@
       return { title: 'Analyse', body };
     },
     mount(el) {
+      if (!S.hasData()) return;
       const ym = S.ui.analysisMonth || S.curYM();
       const mode = S.ui.analysisMode;
       const series = S.series(ym, 6, mode);

@@ -286,8 +286,9 @@
         return fallback;
       }
     },
+    /** Gibt false zurück, wenn nicht gespeichert werden konnte (z. B. Speicher voll oder gesperrt) */
     set(key, val) {
-      try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* Speicher nicht verfügbar */ }
+      try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; }
     },
     remove(key) {
       try { localStorage.removeItem(key); } catch (e) { /* ignorieren */ }

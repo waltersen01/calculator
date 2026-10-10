@@ -201,6 +201,7 @@ button, .tabbar, .nav, .chip, .seg, .avatar, .badge { -webkit-user-select: none;
 input, textarea, select { font: inherit; color: inherit; }
 a { color: var(--accent); }
 h1, h2, h3, p { margin: 0; }
+[hidden] { display: none !important; }
 svg.i { flex: none; display: block; }
 :focus { outline: none; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -490,7 +491,8 @@ html.hide-amounts .chart-amt { visibility: hidden; }
 .btn.plain { background: transparent; color: var(--accent); }
 .btn.sm { width: auto; height: 36px; font-size: 15px; padding: 0 14px; border-radius: 18px; }
 .btn .i { width: 20px; height: 20px; }
-.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.btn-row .btn { padding: 0 12px; white-space: nowrap; }
 .stack-8 { display: grid; gap: 8px; }
 .stack-12 { display: grid; gap: 12px; }
 
@@ -834,3 +836,55 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- Konto verbinden & Import ---------- */
+.option-card {
+  display: flex; gap: 14px; align-items: flex-start; width: 100%; text-align: left; padding: 16px;
+  background: var(--card); border-radius: 22px; box-shadow: var(--shadow-card), inset 0 0 0 var(--hair) var(--sep);
+  transition: transform 0.2s var(--ease);
+}
+.option-card:active { transform: scale(0.985); }
+.option-ic { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
+.option-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.option-title { font-size: 16px; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.option-text { font-size: 14px; color: var(--ink-2); line-height: 1.42; }
+.guide { margin: 0 0 16px; padding: 0; list-style: none; counter-reset: g; display: grid; gap: 12px; }
+.guide li { counter-increment: g; position: relative; padding-left: 36px; min-height: 26px; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
+.guide li::before {
+  content: counter(g); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 13px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px;
+}
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 26px 16px; border-radius: 22px; cursor: pointer;
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); background: var(--accent-soft); color: var(--accent); text-align: center;
+  transition: background 0.2s;
+}
+.dropzone.over, .dropzone:active { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.dropzone:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dz-title { font-weight: 700; font-size: 17px; }
+.dz-sub { font-size: 13px; color: var(--ink-2); }
+svg.i.inline-ic { display: inline-block; vertical-align: -2px; margin-right: 3px; }
+.table-scroll { overflow-x: auto; border-radius: 14px; background: var(--card); }
+table.preview { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+table.preview th, table.preview td { padding: 8px 10px; text-align: left; border-bottom: var(--hair) solid var(--sep); }
+table.preview th { color: var(--ink-2); font-weight: 600; }
+.success .ring.err { background: var(--neg-soft); color: var(--neg); }
+.success .ring.err .i { stroke-dasharray: none; stroke-dashoffset: 0; animation: none; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; background: var(--card-2); padding: 1px 5px; border-radius: 6px; overflow-wrap: anywhere; }
+pre.letter { white-space: pre-wrap; margin: 0; max-height: 46vh; overflow: auto; }
+
+/* Erststart */
+.hero.onboard { padding: 20px 18px 18px; }
+.hero.onboard h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; margin: 12px 0 8px; text-wrap: balance; }
+.hero.onboard p { color: var(--hero-ink-2); font-size: 15px; line-height: 1.45; }
+.onboard-actions { display: grid; gap: 8px; margin-top: 16px; }
+.btn.light { background: rgba(255, 255, 255, 0.12); color: var(--hero-ink); justify-content: flex-start; padding-left: 9px; box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18); }
+.btn.light .avatar { margin-right: 4px; }
+.onboard-other { margin-top: 12px; color: var(--hero-ink-2); font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 2px; }
+.step-no { width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 14px; flex: none; }
+.acc-chip.add { padding: 7px 14px; gap: 6px; color: var(--hero-ink-2); }
+.acc-chip.add .t { font-size: 13px; font-weight: 600; }
+button.profile { width: 100%; text-align: left; border-radius: 22px; }
+button.profile .chev { color: var(--ink-3); }
+.profile .e { display: block; }
+.profile .n { display: block; }

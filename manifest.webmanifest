@@ -1,7 +1,7 @@
 {
   "name": "Finanzkompass",
   "short_name": "Finanzkompass",
-  "description": "Konten, Verträge und Ausgaben im Blick – Demo-Web-App für das iPhone 17.",
+  "description": "Konten von Sparkasse und Trade Republic, Verträge und Ausgaben im Blick – Web-App für das iPhone 17.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

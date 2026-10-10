@@ -1,8 +1,9 @@
-/* Finanzkompass – Profil & Einstellungen, Plus, Datenschutz, Zurücksetzen */
+/* Finanzkompass – Profil & Einstellungen: persönliche Angaben, Darstellung, Live-Verbindung, Backup, Daten löschen */
 (function (FK) {
   'use strict';
   const { html, icon, ui, raw } = FK;
   const S = FK.store;
+  const D = FK.date;
 
   const setting = (key, ic, color, title, sub) => html`<label class="row setting">
     <span class="row-icon" style="background:${color}">${icon(ic, 18)}</span>
@@ -16,51 +17,62 @@
 
   FK.screens.profile = {
     render() {
-      const u = FK.config.user;
-      const plus = S.setting('plus');
+      const p = S.state.profile;
       const theme = S.setting('theme');
+      const liveOk = FK.live.configured();
+      const txCount = S.txs().length;
       const body = html`
-        <div class="profile">
-          <span class="avatar">${FK.util.initials(u.firstName + ' ' + u.lastName)}</span>
-          <div style="min-width:0"><div class="n">${u.firstName} ${u.lastName}</div><div class="e">${u.email}</div>
-            <div style="margin-top:6px">${plus ? ui.badge('Plus aktiv', 'accent', 'crown') : ui.badge('Basis')}</div></div>
-        </div>
-
-        <button type="button" class="plus-hero" data-action="plus">
-          ${ui.topo('plus')}
-          <span class="plus-badge">${icon('crown', 13)}${FK.config.appName} Plus</span>
-          <h3>${plus ? 'Danke, dass du Plus nutzt' : 'Mehr Durchblick mit Plus'}</h3>
-          <p>${plus ? 'Prognose, unbegrenzte Budgets und Auswertungen über alle Monate sind freigeschaltet.' : 'Kontostandsprognose, unbegrenzte Budgets und Analysen über deine gesamte Historie.'}</p>
-          <span class="cta">${plus ? 'Abo verwalten' : '1 Monat kostenlos testen'}${icon('chevron-right', 16)}</span>
+        <button type="button" class="profile" data-action="edit-profile">
+          <span class="avatar">${p.name ? FK.util.initials(p.name) : icon('user', 26)}</span>
+          <span style="min-width:0;flex:1"><span class="n">${p.name || 'Dein Profil'}</span><span class="e">${p.email || 'Name und Adresse für Kündigungsschreiben'}</span></span>
+          ${icon('chevron-right', 18, 'chev')}
         </button>
+
+        ${ui.section('Konten & Daten', html`<div class="list">
+          ${link({ go: '/konten', icon: 'wallet', color: '#00768c', title: 'Konten verwalten', sub: `${S.accounts().length} ${S.accounts().length === 1 ? 'Konto' : 'Konten'} · ${txCount} Umsätze` })}
+          ${link({ action: 'connect', icon: 'plus', color: '#2e9e5b', title: 'Konto verbinden', sub: 'Sparkasse, Trade Republic oder CSV' })}
+          ${link({ action: 'live-settings', icon: 'refresh', color: '#2479b5', title: 'Live-Verbindung (PSD2)', sub: liveOk ? 'Eingerichtet · Enable Banking' : 'Nicht eingerichtet' })}
+          ${link({ go: '/analyse', icon: 'target', color: '#8452bf', title: 'Budgets', sub: `${Object.keys(S.state.budgets).length} aktiv` })}
+        </div>`)}
 
         ${ui.section('Darstellung', html`<div class="card" style="padding:12px">
           ${ui.seg('theme', [{ value: 'system', label: 'System' }, { value: 'light', label: 'Hell' }, { value: 'dark', label: 'Dunkel' }], theme, 'Darstellung')}
         </div>
         <div class="list" style="margin-top:12px">
           ${setting('hideAmounts', 'eye-off', '#5f6f84', 'Beträge ausblenden', 'Für unterwegs: alle Summen werden unscharf')}
+          ${setting('appLock', 'lock', '#2e9e5b', 'Sperrbildschirm beim Öffnen', 'Sichtschutz – die Daten werden dadurch nicht verschlüsselt')}
         </div>`)}
 
-        ${ui.section('Sicherheit & Mitteilungen', html`<div class="list">
-          ${setting('appLock', 'face-id', '#2e9e5b', 'Mit Face ID sperren', 'Beim Öffnen der App entsperren')}
-          ${setting('notifications', 'bell', '#c93a70', 'Mitteilungen', 'Preiserhöhungen, Fristen, Budgets')}
-        </div>`)}
+        ${ui.section('Sicherung', html`<div class="list">
+          ${link({ action: 'export-backup', icon: 'arrow-down', color: '#13804d', title: 'Backup exportieren', sub: 'Alle Konten, Umsätze und Einstellungen als Datei', chevron: false })}
+          ${link({ action: 'import-backup', icon: 'arrow-up', color: '#1c7397', title: 'Backup wiederherstellen', chevron: false })}
+          ${link({ action: 'privacy', icon: 'shield', color: '#6c5bd4', title: 'So werden deine Daten gespeichert' })}
+          ${link({ action: 'about', icon: 'info', color: '#5f6f84', title: `Über ${FK.config.appName}` })}
+          ${link({ action: 'reset', icon: 'trash', color: '#c2322e', title: 'Alle Daten löschen', chevron: false })}
+        </div>
+        <input type="file" accept="application/json,.json" class="sr-only" data-backup-file aria-label="Backup-Datei">`)}
 
-        ${ui.section('Finanzen', html`<div class="list">
-          ${link({ go: '/konten', icon: 'wallet', color: '#00768c', title: 'Konten verwalten', sub: `${S.accounts().length} verbundene Konten` })}
-          ${link({ go: '/analyse', icon: 'target', color: '#8452bf', title: 'Budgets', sub: `${Object.keys(S.state.budgets).length} Budgets aktiv` })}
-          ${link({ go: 'hinweise', icon: 'sparkles', color: '#b26f00', title: 'Hinweise', sub: `${S.insights().length} offen` })}
-        </div>`)}
-
-        ${ui.section('Daten & Datenschutz', html`<div class="list">
-          ${link({ action: 'privacy', icon: 'shield', color: '#13804d', title: 'So schützt die App deine Daten' })}
-          ${link({ action: 'about', icon: 'info', color: '#2479b5', title: `Über ${FK.config.appName}` })}
-          ${link({ action: 'show-lock', icon: 'lock', color: '#5f6f84', title: 'App jetzt sperren' })}
-          ${link({ action: 'reset', icon: 'refresh', color: '#c2322e', title: 'Demo-Daten zurücksetzen', chevron: false })}
-        </div>`)}
-
-        <p class="footnote" style="text-align:center;margin-top:22px">${FK.config.appName} ${FK.config.version} · Demo mit Beispieldaten<br>Inspiriert von Finanzguru – kein offizielles Produkt</p>`;
+        <p class="footnote" style="text-align:center;margin-top:22px">${FK.config.appName} ${FK.config.version} · Inspiriert von Finanzguru – kein offizielles Produkt</p>`;
       return { title: 'Profil', body };
+    },
+    mount(el) {
+      const input = el.querySelector('[data-backup-file]');
+      if (!input) return;
+      input.addEventListener('change', async () => {
+        const f = input.files[0];
+        if (!f) return;
+        try {
+          const text = await f.text();
+          const ok = await ui.confirm({ title: 'Backup wiederherstellen?', text: 'Alle aktuellen Daten auf diesem Gerät werden durch das Backup ersetzt.', confirm: 'Wiederherstellen', destructive: true, icon: 'arrow-up' });
+          if (!ok) return;
+          S.importBackup(text);
+          FK.toast('Backup wiederhergestellt');
+        } catch (e) {
+          FK.toast(e.message || 'Das Backup konnte nicht gelesen werden.', { icon: 'alert', tone: 'info', duration: 5000 });
+        } finally {
+          input.value = '';
+        }
+      });
     },
   };
 
@@ -70,44 +82,107 @@
     S.act.setSetting(key, on);
     const msg = {
       hideAmounts: on ? 'Beträge werden ausgeblendet' : 'Beträge werden angezeigt',
-      appLock: on ? 'Face ID beim Öffnen aktiviert' : 'Sperre deaktiviert',
-      notifications: on ? 'Mitteilungen aktiviert' : 'Mitteilungen deaktiviert',
+      appLock: on ? 'Sperrbildschirm aktiviert' : 'Sperrbildschirm deaktiviert',
     }[key];
-    if (msg) FK.toast(msg, { icon: key === 'appLock' ? 'face-id' : key === 'hideAmounts' ? 'eye-off' : 'bell', tone: 'info' });
+    if (msg) FK.toast(msg, { icon: key === 'appLock' ? 'lock' : 'eye-off', tone: 'info' });
+  };
+
+  FK.actions['edit-profile'] = () => {
+    const p = S.state.profile;
+    const f = (id, label, key, type, ac, ph) => html`<div class="field col"><label for="${id}">${label}</label><input id="${id}" type="${type || 'text'}" value="${p[key]}" data-key="${key}" placeholder="${ph || ''}"${ac ? raw(` autocomplete="${ac}"`) : ''}></div>`;
+    const sheet = FK.sheet.open({
+      title: 'Persönliche Angaben',
+      body: html`<p class="sheet-lead">Für die Begrüßung und deine Kündigungsschreiben. Die Angaben bleiben auf diesem Gerät.</p>
+        <div class="form">${f('p-name', 'Name', 'name', 'text', 'name', 'Vor- und Nachname')}${f('p-street', 'Straße und Hausnummer', 'street', 'text', 'street-address')}${f('p-city', 'PLZ und Ort', 'city', 'text', 'address-level2')}${f('p-mail', 'E-Mail', 'email', 'email', 'email')}</div>`,
+      foot: html`<button type="button" class="btn" data-save>Speichern</button>`,
+    });
+    sheet.foot.querySelector('[data-save]').addEventListener('click', () => {
+      const next = {};
+      sheet.body.querySelectorAll('input[data-key]').forEach((i) => { next[i.dataset.key] = i.value.trim(); });
+      S.act.setProfile(next);
+      FK.nav.refresh();
+      sheet.close();
+      FK.toast('Gespeichert');
+    });
+  };
+
+  FK.actions['live-settings'] = () => {
+    const l = S.state.live;
+    const sheet = FK.sheet.open({
+      title: 'Live-Verbindung (PSD2)',
+      large: true,
+      body: html`<p class="sheet-lead">Konten werden über den regulierten Kontoinformationsdienst Enable Banking abgerufen. Den API-Schlüssel verwahrt dein eigener Proxy (Docker-Container oder Cloudflare Worker) – die Anleitung steht in der README.</p>
+        <div class="callout" data-bundled hidden></div>
+        <div class="form">
+          <div class="field col"><label for="ls-url">Proxy-Adresse</label><input id="ls-url" type="text" inputmode="url" value="${l.proxyUrl}" placeholder="/api oder https://….workers.dev" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+          <div class="field col"><label for="ls-token">Zugriffstoken</label><input id="ls-token" type="password" value="${l.token}" autocomplete="off"></div>
+        </div>
+        <div class="form" style="margin-top:12px"><div class="field col"><label>Redirect-URL für Enable Banking</label><input readonly value="${FK.live.redirectUrl()}"></div></div>
+        <p class="footnote">Das Token wird nur auf diesem Gerät gespeichert.</p>`,
+      foot: html`<button type="button" class="btn" data-test>Speichern und testen</button>${l.proxyUrl ? html`<button type="button" class="btn plain" data-clear style="color:var(--neg)">Live-Zugang entfernen</button>` : ''}`,
+    });
+    if (FK.bundledHint) FK.bundledHint(sheet, '#ls-url');
+    sheet.foot.querySelector('[data-test]').addEventListener('click', async (e) => {
+      const url = sheet.body.querySelector('#ls-url').value.trim();
+      const token = sheet.body.querySelector('#ls-token').value.trim();
+      if (!FK.live.validUrl(url) || token.length < 12) { FK.toast('Bitte Proxy-Adresse (/api oder https://…) und Token eintragen', { icon: 'alert-circle', tone: 'info' }); return; }
+      S.act.setLive({ proxyUrl: url, token });
+      e.target.disabled = true;
+      try {
+        const list = await FK.live.aspsps();
+        FK.toast(`Verbindung klappt · ${list.length} Banken verfügbar`);
+        sheet.close();
+      } catch (err) {
+        e.target.disabled = false;
+        FK.toast(err.message, { icon: 'alert', tone: 'info', duration: 5000 });
+      }
+    });
+    const clear = sheet.foot.querySelector('[data-clear]');
+    if (clear) clear.addEventListener('click', () => {
+      S.act.setLive({ proxyUrl: '', token: '', pending: null });
+      sheet.close();
+      FK.toast('Live-Zugang entfernt', { icon: 'trash', tone: 'info' });
+    });
+  };
+
+  FK.actions['export-backup'] = async () => {
+    const json = S.exportBackup();
+    const name = `finanzkompass-backup-${D.ymd(new Date())}.json`;
+    try {
+      const file = new File([json], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Finanzkompass-Backup' });
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    FK.toast('Backup gespeichert');
+  };
+
+  FK.actions['import-backup'] = () => {
+    const input = document.querySelector('.tab-view.active [data-backup-file]');
+    if (input) input.click();
   };
 
   FK.actions['show-lock'] = () => FK.showLock();
 
-  FK.actions.plus = () => {
-    const plus = S.setting('plus');
-    const sheet = FK.sheet.open({
-      title: `${FK.config.appName} Plus`,
-      body: html`<div class="sheet-hero"><span class="insight-icon" style="width:56px;height:56px;border-radius:28px">${icon('crown', 26)}</span><h3>${plus ? 'Plus ist aktiv' : 'Alles im Blick – auch morgen'}</h3></div>
-        <div class="feature-list">
-          <div>${icon('line-chart', 20)}<span><b>Kontostandsprognose</b><span>Sieh heute, was am Monatsende übrig bleibt.</span></span></div>
-          <div>${icon('target', 20)}<span><b>Unbegrenzte Budgets</b><span>Für jede Kategorie ein eigenes Limit.</span></span></div>
-          <div>${icon('bar-chart', 20)}<span><b>Analysen über alle Monate</b><span>Vergleiche Ausgaben über deine gesamte Historie.</span></span></div>
-          <div>${icon('bell', 20)}<span><b>Frühwarnungen</b><span>Hinweise bei Preiserhöhungen und Fristen.</span></span></div>
-        </div>
-        <p class="footnote" style="text-align:center">Demo: Es wird nichts berechnet und kein Abo abgeschlossen.</p>`,
-      foot: plus
-        ? html`<button type="button" class="btn danger" data-toggle>Plus beenden</button>`
-        : html`<button type="button" class="btn" data-toggle>1 Monat gratis testen</button><p class="footnote" style="text-align:center;margin:0">danach 2,99 € im Monat · monatlich kündbar</p>`,
-    });
-    sheet.foot.querySelector('[data-toggle]').addEventListener('click', () => {
-      S.act.setSetting('plus', !plus);
-      sheet.close();
-      FK.toast(plus ? 'Plus beendet' : 'Plus ist aktiv – viel Spaß!', { icon: 'crown' });
-    });
-  };
-
   FK.actions.privacy = () => {
     FK.sheet.open({
-      title: 'Datenschutz',
+      title: 'Deine Daten',
       body: html`<div class="feature-list" style="margin-top:8px">
-          <div>${icon('lock', 20)}<span><b>Nur auf deinem Gerät</b><span>Einstellungen, Budgets und Notizen speichert diese Demo ausschließlich im lokalen Speicher deines Browsers.</span></span></div>
-          <div>${icon('shield', 20)}<span><b>Keine Bankzugangsdaten</b><span>Es gibt keine Verbindung zu echten Banken. Alle Konten und Umsätze sind erfundene Beispieldaten.</span></span></div>
-          <div>${icon('eye-off', 20)}<span><b>Kein Tracking</b><span>Die App lädt keine Analyse- oder Werbedienste.</span></span></div>
+          <div>${icon('lock', 20)}<span><b>Nur auf diesem Gerät</b><span>Konten, Umsätze und Einstellungen liegen im lokalen Speicher deines Browsers. Es gibt keinen Server, der sie speichert.</span></span></div>
+          <div>${icon('arrow-up', 20)}<span><b>CSV-Dateien bleiben lokal</b><span>Importierte Dateien werden im Browser gelesen und nicht hochgeladen.</span></span></div>
+          <div>${icon('refresh', 20)}<span><b>Live-Verbindung</b><span>Nur wenn du sie einrichtest: Umsätze kommen dann über deinen eigenen Proxy von Enable Banking, einem regulierten Kontoinformationsdienst. Die Bankanmeldung läuft direkt bei der Bank.</span></span></div>
+          <div>${icon('alert-circle', 20)}<span><b>Speicher kann gelöscht werden</b><span>Safari löscht Website-Daten nach längerer Nichtnutzung. Als Home-Bildschirm-App bleiben sie erhalten. Exportiere zur Sicherheit regelmäßig ein Backup.</span></span></div>
         </div>`,
     });
   };
@@ -118,18 +193,18 @@
       body: html`<div class="sheet-hero">${ui.logo(72)}<h3>${FK.config.appName}</h3><p class="sheet-lead" style="margin:0">${FK.config.tagline} · Version ${FK.config.version}</p></div>
         <div class="list">${ui.kv([
           ['Optimiert für', 'iPhone 17 · iOS 26'],
-          ['Viewport', '402 × 874 pt'],
-          ['Technik', 'HTML, CSS, JavaScript – ohne Frameworks'],
-          ['Daten', 'Beispieldaten, lokal erzeugt'],
+          ['Import', 'Sparkasse (CSV-CAMT), Trade Republic, CSV'],
+          ['Live', 'PSD2 über Enable Banking (optional)'],
+          ['Technik', 'HTML, CSS, JavaScript – ohne Server'],
         ])}</div>
-        <p class="footnote">Diese Web-App ist ein Nachbau-Konzept im Stil von Multibanking-Apps wie Finanzguru. Sie steht in keiner Verbindung zu Finanzguru.</p>`,
+        <p class="footnote">Ein Nachbau-Konzept im Stil von Multibanking-Apps wie Finanzguru. Es besteht keine Verbindung zu Finanzguru.</p>`,
     });
   };
 
   FK.actions.reset = async () => {
-    const ok = await ui.confirm({ title: 'Demo-Daten zurücksetzen?', text: 'Kündigungen, Budgets, Kategorien, Notizen und hinzugefügte Konten werden gelöscht.', confirm: 'Zurücksetzen', destructive: true, icon: 'refresh' });
+    const ok = await ui.confirm({ title: 'Alle Daten löschen?', text: 'Konten, Umsätze, Kündigungen, Budgets und Einstellungen werden von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen – exportiere vorher ein Backup.', confirm: 'Alles löschen', destructive: true, icon: 'trash' });
     if (!ok) return;
     S.reset();
-    FK.toast('Demo-Daten zurückgesetzt', { icon: 'refresh', tone: 'info' });
+    FK.toast('Alle Daten gelöscht', { icon: 'trash', tone: 'info' });
   };
 })(window.FK);

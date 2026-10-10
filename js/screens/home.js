@@ -21,19 +21,17 @@
   }
   FK.insightCard = insightCard;
 
-  /** Fällige Abbuchungen und Eingänge der nächsten Tage über alle Konten */
+  /** Erwartete Abbuchungen und Eingänge der nächsten Tage über alle Konten */
   function upcoming(days) {
     const today = S.today();
+    const from = D.addDays(today, 1);
     const until = D.addDays(today, days);
     const items = [];
     for (const c of S.contracts()) {
-      for (const d of FK.data.bookingDates(c, D.addDays(today, 1), until)) {
-        items.push({ date: D.ymd(d), name: c.provider, sub: c.product, amount: -FK.data.priceAt(c, d), merchantId: c.merchant, go: 'vertrag/' + c.id });
-      }
+      for (const d of S.contractDates(c, from, until)) items.push({ date: D.ymd(d), name: c.provider, sub: c.product, amount: -c.amount, merchantId: c.merchant, go: 'vertrag/' + c.id });
     }
-    for (const it of S.scheduled('giro', D.addDays(today, 1), until)) {
-      if (it.kind === 'contract') continue;
-      items.push(Object.assign({}, it, { go: it.kind === 'income' ? null : 'prognose' }));
+    for (const a of S.accounts()) {
+      for (const it of S.scheduled(a.id, from, until)) if (it.kind !== 'contract') items.push(Object.assign({}, it, { go: 'prognose' }));
     }
     return items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.amount - b.amount));
   }
@@ -48,28 +46,76 @@
   }
 
   function mountForecast(el, fc, height, yAxis) {
-    if (!el) return;
+    if (!el || !fc) return;
     FK.charts.line(el, {
       points: fc.points,
       height,
       yAxis,
       todayLabel: true,
       xLabels: forecastLabels(fc),
-      label: `Kontostand Girokonto im ${F.monthName(D.ym(fc.today))}: heute ${eur(fc.current)}, voraussichtlich ${eur(fc.endValue)} am ${F.dm(fc.end)}.`,
+      label: `Kontostand ${fc.account.name} im ${F.monthName(D.ym(fc.today))}: heute ${eur(fc.current)}, voraussichtlich ${eur(fc.endValue)} am ${F.dm(fc.end)}.`,
       tipTitle: (p) => `${F.wdShort(p.date)}${p.kind === 'forecast' ? ' · Prognose' : ''}`,
     });
+  }
+
+  const accLabel = (a) => `${C.bank(a.bankId).short} · ${a.name}`;
+
+  function lastUpdate() {
+    const times = S.accounts().map((a) => a.updatedAt).filter(Boolean).sort();
+    return times.length ? new Date(times[times.length - 1]) : null;
+  }
+
+  function updatedLine() {
+    const u = lastUpdate();
+    if (!u) return '';
+    return html`<div class="updated">${icon('check-circle', 14)}<span>Aktualisiert ${D.sameDay(u, new Date()) ? 'heute' : F.dm(u)}, ${F.time(u)}</span>·<button type="button" data-action="sync">${icon('refresh', 14)}Aktualisieren</button></div>`;
+  }
+  FK.updatedLine = updatedLine;
+
+  function greetingHead() {
+    const name = (S.state.profile.name || '').trim().split(/\s+/)[0];
+    const hour = new Date().getHours();
+    const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
+    return html`<div class="greeting"><div><div class="eyebrow">${F.weekdayLong(S.today())}</div><h1>${greet}${name ? `, ${name}` : ''}</h1></div></div>`;
+  }
+
+  function navActions(insightCount) {
+    const name = (S.state.profile.name || '').trim();
+    return html`<button type="button" class="gbtn" data-go="hinweise" aria-label="Hinweise, ${insightCount} neu">${icon('bell', 21)}${insightCount ? html`<span class="dot"></span>` : ''}</button>
+      <button type="button" class="gbtn avatar-btn" data-go="/profil" aria-label="Profil">${name ? FK.util.initials(name) : icon('user', 20)}</button>`;
+  }
+
+  /* ---------- Erststart ---------- */
+  function onboarding() {
+    return html`
+      <div class="hero onboard">
+        ${ui.topo('hero')}
+        <span class="plus-badge">${icon('compass', 13)}${FK.config.appName}</span>
+        <h2>Verbinde dein erstes Konto</h2>
+        <p>Importiere deine Umsätze von Sparkasse und Trade Republic. Verträge, Prognose und Analyse entstehen daraus automatisch.</p>
+        <div class="onboard-actions">
+          <button type="button" class="btn light" data-action="connect" data-bank="sparkasse">${ui.bankAvatar('sparkasse', 'sm')}Sparkasse verbinden</button>
+          <button type="button" class="btn light" data-action="connect" data-bank="traderepublic">${ui.bankAvatar('traderepublic', 'sm')}Trade Republic verbinden</button>
+        </div>
+        <button type="button" class="onboard-other" data-action="connect" data-bank="other">Andere Bank per CSV-Datei${icon('chevron-right', 16)}</button>
+      </div>
+      ${ui.section('So funktioniert’s', html`<div class="list">
+        ${ui.row({ cls: 'plain', lead: html`<span class="step-no">1</span>`, title: 'Umsätze exportieren', sub: 'Im Online-Banking als CSV-Datei – oder live per PSD2', subWrap: true })}
+        ${ui.row({ cls: 'plain', lead: html`<span class="step-no">2</span>`, title: 'Hier importieren', sub: 'Die Datei wird nur auf diesem Gerät gelesen', subWrap: true })}
+        ${ui.row({ cls: 'plain', lead: html`<span class="step-no">3</span>`, title: 'Überblick bekommen', sub: 'Kategorien, Verträge, Gehalt und Prognose werden erkannt', subWrap: true })}
+      </div>`)}
+      <div class="callout" style="margin-top:16px">${icon('lock', 20)}<span><b>Deine Daten bleiben bei dir.</b> Es gibt keinen Server, der deine Umsätze speichert. Tipp: Füge die App zum Home-Bildschirm hinzu, damit Safari die Daten nicht nach längerer Nichtnutzung löscht.</span></div>`;
   }
 
   /* ---------- Übersicht ---------- */
   FK.screens.home = {
     render() {
-      const today = S.today();
+      if (!S.hasData()) {
+        return { title: 'Übersicht', head: greetingHead(), actions: navActions(0), body: onboarding() };
+      }
       const tot = S.totals();
-      const user = FK.config.user;
-      const hour = new Date().getHours();
-      const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
       const ins = S.insights();
-      const fc = S.forecast('giro');
+      const fc = S.forecast();
       const ym = S.curYM();
       const m = S.month(ym);
       const hidden = !!S.setting('hideAmounts');
@@ -78,35 +124,32 @@
       const recent = S.txs().slice(0, 6);
       const topCats = m.expenseCats.slice(0, 3);
       const maxCat = topCats.length ? topCats[0].amount : 1;
-      const salary = fc.items.find((i) => i.kind === 'income');
-      const outs = fc.items.filter((i) => i.amount < 0);
-      const initials = FK.util.initials(user.firstName + ' ' + user.lastName);
-      const synced = new Date(S.state.lastSync || Date.now());
-
-      const head = html`<div class="greeting"><div><div class="eyebrow">${F.weekdayLong(today)}</div><h1>${greet}, ${user.firstName}</h1></div></div>`;
 
       const hero = html`<div class="hero">
         ${ui.topo('hero')}
         <div class="hero-top">
-          <span class="hero-label">Gesamtsaldo · ${accounts.length} Konten</span>
+          <span class="hero-label">Gesamtsaldo · ${accounts.length} ${accounts.length === 1 ? 'Konto' : 'Konten'}</span>
           <button type="button" class="hero-eye" data-action="toggle-hide" aria-pressed="${String(hidden)}" aria-label="${hidden ? 'Beträge anzeigen' : 'Beträge ausblenden'}">${icon(hidden ? 'eye-off' : 'eye', 20)}</button>
         </div>
         <div class="hero-amount amt prop">${eur(tot.total)}</div>
         <div class="hero-delta">${icon(tot.monthDelta >= 0 ? 'trending-up' : 'trending-down')}<span><span class="amt">${eur(tot.monthDelta, { sign: true })}</span> seit 1. ${F.monthName(ym)}</span></div>
         <div class="acc-chips">
-          ${accounts.map((a) => html`<button type="button" class="acc-chip" data-go="konto/${a.id}">${ui.bankAvatar(a.bankId, 'sm')}<span><span class="t">${C.bank(a.bankId).short} · ${a.name}</span><br><span class="v amt">${eur(S.balance(a.id))}</span></span></button>`)}
+          ${accounts.map((a) => html`<button type="button" class="acc-chip" data-go="konto/${a.id}">${ui.bankAvatar(a.bankId, 'sm')}<span><span class="t">${accLabel(a)}</span><br><span class="v amt">${eur(S.balance(a.id))}</span></span></button>`)}
+          <button type="button" class="acc-chip add" data-action="connect" aria-label="Konto verbinden">${icon('plus', 18)}<span class="t">Konto</span></button>
         </div>
       </div>`;
 
-      const forecast = ui.section('Kontostandsprognose', html`<div class="card forecast-card">
+      const salary = fc ? fc.items.find((i) => i.kind === 'income') : null;
+      const outs = fc ? fc.items.filter((i) => i.amount < 0) : [];
+      const forecast = fc ? ui.section('Kontostandsprognose', html`<div class="card forecast-card">
           <div class="fc-head"><div>
-            <div class="card-title">Girokonto · Sparkasse</div>
+            <div class="card-title">${accLabel(fc.account)}</div>
             <div class="fc-value amt prop">${eur(fc.endValue)}</div>
             <div class="fc-sub">voraussichtlich am ${F.dayMonth(fc.end)}</div>
-          </div>${fc.lowest.value < 0 ? ui.badge('Dispo droht', 'neg', 'alert') : ui.badge('Plus', 'accent', 'crown')}</div>
+          </div>${fc.lowest.value < 0 ? ui.badge('Minus droht', 'neg', 'alert') : ''}</div>
           <div class="chart" data-chart="home-forecast" style="margin-top:12px"></div>
-          <div class="fc-foot"><span>Noch <b>${outs.length} Abbuchungen</b> · <span class="amt">${eur(fc.outgoing)}</span></span>${salary ? html`<span>Gehalt <b>${F.dm(salary.date)}</b></span>` : ''}</div>
-        </div>`, { go: 'prognose', text: 'Details' });
+          <div class="fc-foot"><span>Noch <b>${outs.length} ${outs.length === 1 ? 'Abbuchung' : 'Abbuchungen'}</b> · <span class="amt">${eur(fc.outgoing)}</span></span>${salary ? html`<span>Eingang <b>${F.dm(salary.date)}</b></span>` : ''}</div>
+        </div>`, { go: 'prognose', text: 'Details' }) : '';
 
       const insights = ins.length
         ? ui.section('Für dich', html`<div class="carousel">${ins.slice(0, 6).map((i) => insightCard(i))}</div>`, { go: 'hinweise', text: `Alle ${ins.length}` })
@@ -127,32 +170,28 @@
 
       const upBlock = up.length ? ui.section('Demnächst', html`<div class="list">
         ${up.map((u) => ui.row({ go: u.go, lead: ui.merchantAvatar(u.merchantId, u.name), title: u.name, sub: `${F.due(u.date).replace(/^./, (x) => x.toUpperCase())} · ${u.sub}`, end: ui.amt(u.amount, { colored: true }) }))}
-      </div>`, { go: 'prognose', text: 'Alle' }) : '';
+      </div>`, fc ? { go: 'prognose', text: 'Alle' } : null) : '';
 
-      const recentBlock = ui.section('Letzte Umsätze', html`<div class="list">${recent.map((t) => ui.txRow(t, { showDate: true }))}</div>`, { go: 'umsaetze', text: 'Alle' });
-
-      const body = html`${hero}${forecast}${insights}${monthBlock}${upBlock}${recentBlock}
-        <div class="updated">${icon('check-circle', 14)}<span>Aktualisiert ${D.sameDay(synced, new Date()) ? 'heute' : F.dm(synced)}, ${F.time(synced)}</span>·<button type="button" data-action="sync">${icon('refresh', 14)}Aktualisieren</button></div>
-        <p class="footnote" style="text-align:center">Demo mit Beispieldaten · keine echte Bankverbindung</p>`;
+      const recentBlock = recent.length ? ui.section('Letzte Umsätze', html`<div class="list">${recent.map((t) => ui.txRow(t, { showDate: true }))}</div>`, { go: 'umsaetze', text: 'Alle' }) : '';
 
       return {
         title: 'Übersicht',
-        head,
+        head: greetingHead(),
         refresh: true,
-        actions: html`<button type="button" class="gbtn" data-go="hinweise" aria-label="Hinweise, ${ins.length} neu">${icon('bell', 21)}${ins.length ? html`<span class="dot"></span>` : ''}</button>
-          <button type="button" class="gbtn avatar-btn" data-go="/profil" aria-label="Profil">${initials}</button>`,
-        body,
+        actions: navActions(ins.length),
+        body: html`${hero}${forecast}${insights}${monthBlock}${upBlock}${recentBlock}${updatedLine()}`,
       };
     },
     mount(el) {
-      mountForecast(el.querySelector('[data-chart="home-forecast"]'), S.forecast('giro'), 128, false);
+      if (S.hasData()) mountForecast(el.querySelector('[data-chart="home-forecast"]'), S.forecast(), 128, false);
     },
   };
 
   /* ---------- Prognose ---------- */
   FK.screens.forecast = {
     render() {
-      const fc = S.forecast('giro');
+      const fc = S.forecast();
+      if (!fc) return { title: 'Prognose', body: ui.empty('line-chart', 'Noch keine Prognose', 'Verbinde ein Girokonto, damit die App deinen Kontostand bis Monatsende hochrechnen kann.') };
       const byDate = FK.util.groupBy(fc.items, (i) => i.date);
       const rows = [];
       for (const [date, list] of byDate) {
@@ -163,14 +202,13 @@
             title: it.name,
             sub: `${F.wdShort(date)} · ${it.sub}`,
             end: ui.amt(it.amount, { colored: true }),
-            endSub: it.estimate ? 'geschätzt' : null,
           }));
         }
       }
       const table = ui.srTable('Kontostand je Tag', ['Datum', 'Kontostand', 'Art'], fc.points.map((p) => [F.dmy(p.date), eur(p.value), p.kind === 'forecast' ? 'Prognose' : 'Ist']));
       const body = html`
         <div class="card">
-          <div class="card-title">Girokonto · Sparkasse</div>
+          <div class="card-title">${accLabel(fc.account)}</div>
           <div class="big-figure amt prop" style="margin-top:4px">${eur(fc.endValue)}</div>
           <div class="fc-sub">voraussichtlich am ${F.long(fc.end)}</div>
           <div class="chart" data-chart="forecast" style="margin-top:14px"></div>
@@ -181,17 +219,16 @@
         ${ui.section('So entsteht die Prognose', html`<div class="list">${ui.kv([
           ['Kontostand heute', html`<span class="amt">${eur(fc.current)}</span>`],
           ['Erwartete Eingänge', html`<span class="amt pos">${eur(fc.incoming, { sign: true })}</span>`],
-          ['Geplante Abbuchungen', html`<span class="amt">${eur(fc.outgoing)}</span>`],
+          ['Erwartete Abbuchungen', html`<span class="amt">${eur(fc.outgoing)}</span>`],
           [`Alltagsausgaben (Ø ${eur(-fc.perDay)} / Tag)`, html`<span class="amt">${eur(fc.variable)}</span>`],
           ['Am Monatsende', html`<span class="amt"><b>${eur(fc.endValue)}</b></span>`],
         ])}</div>
-        <p class="footnote">Grundlage sind deine Verträge, regelmäßige Eingänge wie dein Gehalt und deine durchschnittlichen Alltagsausgaben der letzten 90 Tage.</p>`)}
-        ${ui.section(`Geplant bis ${F.dm(fc.end)}`, rows.length ? html`<div class="list">${rows}</div>` : ui.empty('calendar', 'Keine geplanten Buchungen', 'Bis Monatsende ist nichts mehr fällig.'))}
-      `;
-      return { title: 'Prognose', large: true, body };
+        <p class="footnote">Grundlage sind erkannte Verträge, regelmäßige Eingänge und Überweisungen sowie deine durchschnittlichen Alltagsausgaben der letzten 90 Tage auf diesem Konto.</p>`)}
+        ${ui.section(`Erwartet bis ${F.dm(fc.end)}`, rows.length ? html`<div class="list">${rows}</div>` : ui.empty('calendar', 'Nichts mehr geplant', 'Bis Monatsende wurden keine wiederkehrenden Buchungen erkannt.'))}`;
+      return { title: 'Prognose', body };
     },
     mount(el) {
-      mountForecast(el.querySelector('[data-chart="forecast"]'), S.forecast('giro'), 210, true);
+      mountForecast(el.querySelector('[data-chart="forecast"]'), S.forecast(), 210, true);
     },
   };
 
@@ -202,7 +239,7 @@
       const visible = all.filter((i) => !S.state.dismissed[i.id]);
       const hiddenCount = all.length - visible.length;
       const body = html`
-        ${visible.length ? html`<div class="stack-12">${visible.map((i) => insightCard(i, true))}</div>` : ui.empty('check-circle', 'Alles erledigt', 'Du hast alle Hinweise gelesen.')}
+        ${visible.length ? html`<div class="stack-12">${visible.map((i) => insightCard(i, true))}</div>` : ui.empty('check-circle', S.hasData() ? 'Alles erledigt' : 'Noch keine Hinweise', S.hasData() ? 'Du hast alle Hinweise gelesen.' : 'Sobald du ein Konto verbindest, erscheinen hier Hinweise zu Verträgen, Budgets und deinem Kontostand.')}
         ${hiddenCount ? html`<div style="margin-top:16px;text-align:center"><button type="button" class="btn sm tinted" data-action="restore-insights">${icon('eye', 18)}${hiddenCount} ausgeblendete anzeigen</button></div>` : ''}
         <p class="footnote" style="text-align:center">Hinweise entstehen automatisch aus deinen Umsätzen, Verträgen und Budgets.</p>`;
       return { title: 'Hinweise', body };
